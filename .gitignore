@@ -21,13 +21,17 @@ target
 #.idea/
 
 # Hide file
-server/vndb-sync/data
-server/vndb-sync/data-origin
-server/vndb-sync/data-test
-server/vndb-sync/vndb-img
+# change: data -> data/
+server/vndb-sync/data/
+server/vndb-sync/data-origin/
+server/vndb-sync/data-test/
+server/vndb-sync/vndb-img/
 
 # Optional: Hide the sentinel file if you don't want it in git
 **/*.last
 
 # Hide env files
 **/.env
+
+# Hide log files
+**/*.log

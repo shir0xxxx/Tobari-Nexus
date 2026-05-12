@@ -1,17 +1,30 @@
 #!/bin/bash
 
-#TODO: insufficient-space detection function
-#TODO: network error function(maybe global)
-#TODO: step 4 delete and rebuild
-#TODO: run this script, will collect to log, later(global)
+#this TODO just application in this script
+#TODO: 1. insufficient-space detection function
+#TODO: 2. network error function(maybe global)
+#TODO: 3.
+#TODO: 4. run this script, will collect to log, later(global)
+#TODO: 5.
+#TODO: 6. 
+#TODO: 7.
+#TODO: 8. 
+#TODO: 9. env safety check
+#TODO: 10. different device sync vndb database without official
+#TODO: 11. colected log error 1 2, like >&2 , later
+
+# script location independent
+BASE_DIR=$(cd "$(dirname "$0")"; pwd)
+#source BASE_DIR, just support .env, can't variable
 
 # --- 1. Directory Configuration ---
-BASE_DIR="$HOME/vndb-sync"
+#TODO: 6. later variable name will be refactoring, maybe
 ORIGIN_DIR="$BASE_DIR/data-origin"
 TEST_DIR="$BASE_DIR/data-test"
 DATA_DIR="$BASE_DIR/data"
 IMG_DIR="$BASE_DIR/vndb-img"
 
+#TODO: 5.if this url can't touch(project never maintain), or move to another url, fixed later
 URL_PREFIX="https://dl.vndb.org/dump"
 IMG_SRC="rsync://dl.vndb.org/vndb-img/"
 
@@ -57,15 +70,15 @@ if [ "$ARCHIVE" -nt "$SENTINEL" ]; then
     
     # Tags
     mkdir -p "$TEST_DIR/vndb-tags-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-tags-latest.json.gz" > "$TEST_DIR/vndb-tags-latest/tags.json"
+    gunzip -c "$ORIGIN_DIR/vndb-tags-latest.json.gz" > "$TEST_DIR/vndb-tags-latest/vndb-tags-latest.json"
     
     # Traits
     mkdir -p "$TEST_DIR/vndb-traits-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-traits-latest.json.gz" > "$TEST_DIR/vndb-traits-latest/traits.json"
+    gunzip -c "$ORIGIN_DIR/vndb-traits-latest.json.gz" > "$TEST_DIR/vndb-traits-latest/vndb-traits-latest.json"
     
     # Votes
     mkdir -p "$TEST_DIR/vndb-votes-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-votes-latest.gz" > "$TEST_DIR/vndb-votes-latest/votes.sql"
+    gunzip -c "$ORIGIN_DIR/vndb-votes-latest.gz" > "$TEST_DIR/vndb-votes-latest/vndb-votes-latest.sql"
 
     touch "$SENTINEL"
 else
@@ -76,6 +89,7 @@ fi
 if [ "$NEED_UPDATE" = true ]; then
     echo "Deploying verified data to production: $DATA_DIR"
     
+    #TODO: 3. need update true, then will be test for production env, complete no error, then deploy and sync to data dir
     # rsync keeps production in sync while excluding internal metadata (.last)
     rsync -av --delete "$TEST_DIR/" "$DATA_DIR/" --exclude="*.last"
     
@@ -85,9 +99,42 @@ else
 fi
 
 # --- 5. Image Library Sync ---
-echo "Syncing images via Rsync..."
+#TODO: 7. this sync will be reaction with TODO3
+#TODO: 8. safety check for image sync, update later, need add backup mirror file sync, maybe
+#backup a vndb-img, if official image delete
+echo "Running Pre-sync Safety Check..."
+
+# simulation rsync delete file count
+DEL_COUNT=$(rsync -rtpvz --del --dry-run "$IMG_SRC" "$IMG_DIR/" | grep "^deleting " | wc -l)
+
+# get vndb image file count
+VNDB_IMAGE_COUNT_FILE="$BASE_DIR/.vndb_image_count_file"
+if [ -f "$VNDB_IMAGE_COUNT_FILE" ]; then
+    #if exist, read it to VNDB_IMAGE_COUNT
+    VNDB_IMAGE_COUNT=$(cat "$VNDB_IMAGE_COUNT_FILE")
+else
+    LOCAL_COUNT=$(find "$IMG_DIR" -type f | wc -l)
+    VNDB_IMAGE_COUNT=$LOCAL_COUNT
+fi
+
+# calculate if delete count exceed 10%, stop it
+if [ "$VNDB_IMAGE_COUNT" -gt 0 ]; then
+    # set threshold at 10%
+    THRESHOLD=$((VNDB_IMAGE_COUNT / 10))
+    
+    if [ "$DEL_COUNT" -gt "$THRESHOLD" ]; then
+        echo "CRITICAL: Remote attempts to delete $DEL_COUNT files (Exceeds 10% threshold: $THRESHOLD)." >&2
+        echo "SYNC ABORTED FOR SAFETY." >&2
+        # backup mirror file
+        exit 1
+    fi
+fi
+
 if rsync -rtpvz --del --partial --timeout=60 "$IMG_SRC" "$IMG_DIR/"; then
     echo "Images synced successfully."
+    echo "Calculating IMG_DIR file count for .vndb_image_count_file..."
+    NEW_VNDB_IMAGE_COUNT=$(find "$IMG_DIR" -type f | wc -l)
+    echo "$NEW_VNDB_IMAGE_COUNT" > "$VNDB_IMAGE_COUNT_FILE"
 else
     echo "WARNING: Image sync encountered partial errors." >&2
 fi
