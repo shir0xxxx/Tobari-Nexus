@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #this TODO just application in this script
-#TODO: 1. insufficient-space detection function
+#TODO: 1. FIRST insufficient-space detection function
 #TODO: 2. network error function(maybe global)
 #TODO: 3.
 #TODO: 4. run this script, will collect to log, later(global)
@@ -9,9 +9,9 @@
 #TODO: 6. 
 #TODO: 7.
 #TODO: 8. 
-#TODO: 9. env safety check
+#TODO: 9. FIRST env safety check
 #TODO: 10. different device sync vndb database without official
-#TODO: 11. colected log error 1 2, like >&2 , later
+#TODO: 11. FIRST colected log error 1 2, like >&2 , later
 
 # script location independent
 BASE_DIR=$(cd "$(dirname "$0")"; pwd)
