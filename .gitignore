@@ -26,6 +26,7 @@ server/vndb-sync/data/
 server/vndb-sync/data-origin/
 server/vndb-sync/data-test/
 server/vndb-sync/vndb-img/
+server/vndb-sync/.vndb_image_count_file
 
 # Optional: Hide the sentinel file if you don't want it in git
 **/*.last

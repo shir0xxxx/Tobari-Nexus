@@ -39,11 +39,10 @@ echo "Checking remote updates in $ORIGIN_DIR..."
 FILES=("vndb-db-latest.tar.zst" "vndb-tags-latest.json.gz" "vndb-traits-latest.json.gz" "vndb-votes-latest.gz")
 NEED_UPDATE=false
 
+# 依次下载所有文件
 for file in "${FILES[@]}"; do
     echo "Processing $file..."
-    # -o "$file": Ensures the local file name is fixed to 'latest' regardless of server redirect
-    # --conditional-get: only downloads if server-side timestamp is newer than local
-    if aria2c -s16 -x16 -k1M -c --conditional-get=true --allow-overwrite=true \
+    if aria2c -s16 -x16 -k1M -c --check-integrity=true --conditional-get=true --allow-overwrite=true \
        --auto-file-renaming=false -o "$file" -d "$ORIGIN_DIR" "$URL_PREFIX/$file"; then
         echo "$file check completed."
     else
@@ -60,27 +59,47 @@ if [ "$ARCHIVE" -nt "$SENTINEL" ]; then
     echo "Newer archive detected. Extracting to native structures in $TEST_DIR..."
     NEED_UPDATE=true
 
-    # --- A. Extract Core DB Archive ---
-    # This usually creates its own 'db' folder, but we put it in its own namespace for safety
-    mkdir -p "$TEST_DIR/vndb-db-latest"
-    tar -I zstd -xf "$ARCHIVE" -C "$TEST_DIR/vndb-db-latest"
-    
-    # --- B. Handle JSON & Other Files ---
-    # We create a directory for each type to keep it "Original"
-    
-    # Tags
-    mkdir -p "$TEST_DIR/vndb-tags-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-tags-latest.json.gz" > "$TEST_DIR/vndb-tags-latest/vndb-tags-latest.json"
-    
-    # Traits
-    mkdir -p "$TEST_DIR/vndb-traits-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-traits-latest.json.gz" > "$TEST_DIR/vndb-traits-latest/vndb-traits-latest.json"
-    
-    # Votes
-    mkdir -p "$TEST_DIR/vndb-votes-latest"
-    gunzip -c "$ORIGIN_DIR/vndb-votes-latest.gz" > "$TEST_DIR/vndb-votes-latest/vndb-votes-latest.sql"
+    # 重点 1：解压前，先清空 Test 目录里的旧文件夹，防止上次失败的残骸污染这次的数据
+    rm -rf "$TEST_DIR/vndb-db-latest" "$TEST_DIR/vndb-tags-latest" "$TEST_DIR/vndb-traits-latest" "$TEST_DIR/vndb-votes-latest"
+    mkdir -p "$TEST_DIR/vndb-db-latest" "$TEST_DIR/vndb-tags-latest" "$TEST_DIR/vndb-traits-latest" "$TEST_DIR/vndb-votes-latest"
 
+    # 重点 2：Fail-Fast 线性解压。加了 '!' 表示如果命令执行失败，就进入 if 里面报错退出。
+    
+    # A. 解压 Core DB
+    if ! tar -I zstd -xf "$ARCHIVE" -C "$TEST_DIR/vndb-db-latest"; then
+        echo "CRITICAL ERROR: vndb-db-latest.tar.zst is corrupted! Deleting..." >&2
+        rm -f "$ARCHIVE"
+        exit 1
+    fi
+    echo "vndb-db-latest decompressed successfully."
+
+    # B. 解压 Tags
+    if ! gunzip -c "$ORIGIN_DIR/vndb-tags-latest.json.gz" > "$TEST_DIR/vndb-tags-latest/vndb-tags-latest.json"; then
+        echo "CRITICAL ERROR: vndb-tags-latest.json.gz is corrupted! Deleting..." >&2
+        rm -f "$ORIGIN_DIR/vndb-tags-latest.json.gz"
+        exit 1
+    fi
+    echo "vndb-tags-latest decompressed successfully."
+
+    # C. 解压 Traits
+    if ! gunzip -c "$ORIGIN_DIR/vndb-traits-latest.json.gz" > "$TEST_DIR/vndb-traits-latest/vndb-traits-latest.json"; then
+        echo "CRITICAL ERROR: vndb-traits-latest.json.gz is corrupted! Deleting..." >&2
+        rm -f "$ORIGIN_DIR/vndb-traits-latest.json.gz"
+        exit 1
+    fi
+    echo "vndb-traits-latest decompressed successfully."
+
+    # D. 解压 Votes
+    if ! gunzip -c "$ORIGIN_DIR/vndb-votes-latest.gz" > "$TEST_DIR/vndb-votes-latest/vndb-votes-latest.sql"; then
+        echo "CRITICAL ERROR: vndb-votes-latest.gz is corrupted! Deleting..." >&2
+        rm -f "$ORIGIN_DIR/vndb-votes-latest.gz"
+        exit 1
+    fi
+    echo "vndb-votes-latest decompressed successfully."
+
+    # 只有上面四步全部通关，才会执行到这里，打上哨兵标记
     touch "$SENTINEL"
+    echo "All files extracted safely."
 else
     echo "Files in $TEST_DIR are already natively organized."
 fi
